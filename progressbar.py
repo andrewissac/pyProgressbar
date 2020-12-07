@@ -38,13 +38,13 @@ def rgbToBash(r,g,b):
 
 def hlsToBash(h,l,s):
     r,g,b = tuple(int(x * 255) for x in c.hls_to_rgb(h, l, s))
-    return '\033[38;2;' + str(r) + ';' + str(g) + ';' + str(b) + 'm'
+    return rgbToBash(r,g,b)
 
 def progress(
     count, total, cycleCharsDeque, message='', 
-    progressbarSegments=60, boldChars=False, rainbowWave=True, 
-    charsColorDistanceParam=25, colorChangeSpeedParam=1.0,
-    luminosity=0.65, saturation=1.0): 
+    progressbarSegments = 60, boldChars = False,  rainbowWave= True, 
+    charsColorDistanceParam=25, colorChangeSpeedParam = 1.0,
+    luminosity = 0.65, saturation = 1.0): 
     # progressbarSegments % len(waveCharsDeque) should be 0 to ensure a perfect loop
     progressbarSegments = progressbarSegments # number of bar segments
     filledProgressbarSegments = int(round(progressbarSegments * count / float(total))) # number of bar segments that are filled
@@ -72,7 +72,7 @@ def progress(
     bar += bcolors.ENDC
     bar += '-' * (progressbarSegments - filledProgressbarSegments)
 
-    sys.stdout.write('[%s] %s%s ...%s\r' % (bar, percentage, '%', message))
+    sys.stdout.write('[{0}] {1}% ...{2}\r'.format(bar, percentage, message))
     sys.stdout.flush()
 
 def repeatList(l, n):
@@ -87,19 +87,34 @@ def repeatList(l, n):
 # region usage example
 # from time import sleep
 # from collections import deque
-# total = 1500 # could be any number depending on your problem
 # wave = ',.~*^`^*~.'
 # tableflip = '(ノಠ 益ಠ)ノ彡┻━┻........'
 # rectangles = '▮▮▮▮▮▮▮▮▮▮'
-# chars = [char for char in tableflip]
+# chars = [char for char in wave]
 
 # progressbarSegments = 60 # 
 # cycleCharsDeque = deque(repeatList(chars, progressbarSegments)) # deque needed for cyclic rotation of chars
 
+# # demo 1
+# total = 1500
 # for i in range(total):
 #     sleep(0.02) # simulate task that takes a while
 #     progress(
 #         count=i, total=total, cycleCharsDeque=cycleCharsDeque, message='myMessage',
+#         progressbarSegments=progressbarSegments, boldChars=False, rainbowWave=True, 
+#         charsColorDistanceParam=25, colorChangeSpeedParam=4.0,
+#         luminosity=0.65, saturation=1.0)
+
+#     if(i % 5 == 0): # simple mechanism to only rotate chars every 5 loop steps (may vary in your case)
+#         cycleCharsDeque.rotate(-1) # cyclic rotation of charsList
+
+# # demo 2
+# chars = [char for char in tableflip]
+# cycleCharsDeque = deque(repeatList(chars, progressbarSegments)) # deque needed for cyclic rotation of chars
+# for i in range(total):
+#     sleep(0.02) # simulate task that takes a while
+#     progress(
+#         count=i, total=total, cycleCharsDeque=cycleCharsDeque, message='TROLOLOL',
 #         progressbarSegments=progressbarSegments, boldChars=False, rainbowWave=True, 
 #         charsColorDistanceParam=25, colorChangeSpeedParam=4.0,
 #         luminosity=0.65, saturation=1.0)
