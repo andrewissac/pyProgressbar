@@ -4,6 +4,7 @@ Rainbow progressbar for bash output using python
 ```python
 # region usage example
 from time import sleep
+from progressbar import Progressbar
 
 def simulateLongTask(progressbar):
     for i in range(total):
