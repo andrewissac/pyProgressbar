@@ -1,26 +1,6 @@
-# based on https://gist.github.com/vladignatyev/06860ec2040cb497f0f3
-# The MIT License (MIT)
-# Copyright (c) 2016 Vladimir Ignatev
-#
-# Permission is hereby granted, free of charge, to any person obtaining 
-# a copy of this software and associated documentation files (the "Software"), 
-# to deal in the Software without restriction, including without limitation 
-# the rights to use, copy, modify, merge, publish, distribute, sublicense, 
-# and/or sell copies of the Software, and to permit persons to whom the Software 
-# is furnished to do so, subject to the following conditions:
-# 
-# The above copyright notice and this permission notice shall be included 
-# in all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, 
-# INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR 
-# PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE
-# FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT
-# OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE 
-# OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
 import sys
 import colorsys as c
+from collections import deque
 
 class bcolors:
     HEADER = '\033[95m'
@@ -40,85 +20,90 @@ def hlsToBash(h,l,s):
     r,g,b = tuple(int(x * 255) for x in c.hls_to_rgb(h, l, s))
     return rgbToBash(r,g,b)
 
-def progress(
-    count, total, cycleCharsDeque, message='', 
-    progressbarSegments = 60, boldChars = False,  rainbowWave= True, 
-    charsColorDistanceParam=25, colorChangeSpeedParam = 1.0,
-    luminosity = 0.65, saturation = 1.0): 
-    # progressbarSegments % len(waveCharsDeque) should be 0 to ensure a perfect loop
-    progressbarSegments = progressbarSegments # number of bar segments
-    filledProgressbarSegments = int(round(progressbarSegments * count / float(total))) # number of bar segments that are filled
-    # using HLS colorspace
-    h = 0.0 
-    if (count / float(total)) * colorChangeSpeedParam < 1.0:
-        h = (count / float(total)) * colorChangeSpeedParam
-    else:
-        h = (count / float(total)) * colorChangeSpeedParam - 1.0 # make it repeat (remember hue interval: 0..1)
-    l = luminosity # should be between 0 and 1
-    s = saturation # should be between 0 and 1
+class Progressbar():
+    def __init__(
+        self, totalCount, segments = 60, bold = False, rainbowWaveEnabled = True, 
+        animateLeftToRight = True, animationSpeed = 5, rainbowColorChangeSpeed = 2.0, 
+        rainbowColorIncrement = 25, luminosity = 0.65, saturation = 1.0):
+        self.totalCount = totalCount
+        # segments % len(displayPattern) should be 0 to get a perfect loop
+        self.segments = segments
+        self.bold = bold
+        self.rainbowWaveEnabled = rainbowWaveEnabled
+        self.__rainbowColorIncrement = rainbowColorIncrement
+        self.animationSpeed = 5 # every 5 steps -> cyclic rotate displaypattern, may vary on each case!
+        self.animateLeftToRight = animateLeftToRight
+        self.rainbowColorChangeSpeed = rainbowColorChangeSpeed
+        self.luminosity = luminosity
+        self.saturation = saturation
+        self.patterns = { 
+            "wave" : ',.~*^`^*~.', 
+            "tableflip" : '(ノಠ 益ಠ)ノ彡┻━┻........', 
+            "rectangles" : '▮'
+        }
+        self.displayPattern = self.__generateCharsDeque(self.patterns["wave"])
 
-    percentage = round(100.0 * count / float(total), 1)
-    bar = hlsToBash(h,l,s)
-    if boldChars:
-        bar += bcolors.BOLD
-    if rainbowWave:
-        h_increment = (charsColorDistanceParam / float(total)) * colorChangeSpeedParam
-        for i in range(filledProgressbarSegments):
-            bar += cycleCharsDeque[i] + hlsToBash(h,l,s)
-            h += h_increment
-    else:
-        for i in range(filledProgressbarSegments):
-            bar += cycleCharsDeque[i]
-    bar += bcolors.ENDC
-    bar += '-' * (progressbarSegments - filledProgressbarSegments)
+    def AddNewDisplayPattern(self, patternName: str, patternString: str):
+        self.patterns[patternName] = patternString
+    
+    def SetDisplayPattern(self, dispPattern: str):
+        if (dispPattern not in self.patterns.keys()):
+            self.AddNewDisplayPattern(dispPattern, dispPattern)
+        self.displayPattern = self.__generateCharsDeque(self.patterns[dispPattern])
+    
+    def AddAndSetNewDisplayPattern(self, patternName: str, patternString: str):
+        self.AddNewDisplayPattern(patternName, patternString)
+        self.SetDisplayPattern(patternName)
 
-    sys.stdout.write('[{0}] {1}% ...{2}\r'.format(bar, percentage, message))
-    sys.stdout.flush()
+    def ShowProgress(self, count: int = 0, message: str= ''):
+        if(count % self.animationSpeed == 0): # simple mechanism to only rotate chars every n loop steps (may vary in your case)
+            if(self.animateLeftToRight):
+                self.displayPattern.rotate(-1) # cyclic rotation of displayPattern
+            else:
+                self.displayPattern.rotate(1) # cyclic rotation of displayPattern
+        filledProgressbarSegments = int(round(self.segments * count / float(self.totalCount)))
 
-def repeatList(l, n):
-    '''
-    Repeats a given list l until length n is reached.
-    e.g. [1,2,3] -> repeatList([1,2,3], 7) -> returns [1,2,3,1,2,3,1]
-    '''
-    l.extend(l * n)
-    l = l[:n]
-    return l
+        # using HLS colorspace
+        h = 0.0 
+        if (count / float(self.totalCount)) * self.rainbowColorChangeSpeed < 1.0:
+            h = (count / float(self.totalCount)) * self.rainbowColorChangeSpeed
+        else:
+            h = (count / float(self.totalCount)) * self.rainbowColorChangeSpeed - 1.0 # make it repeat (remember hue interval: 0..1)
+        l = self.luminosity # should be between 0 and 1
+        s = self.saturation # should be between 0 and 1
 
-# region usage example
-# from time import sleep
-# from collections import deque
-# wave = ',.~*^`^*~.'
-# tableflip = '(ノಠ 益ಠ)ノ彡┻━┻........'
-# rectangles = '▮▮▮▮▮▮▮▮▮▮'
-# chars = [char for char in wave]
+        percentage = round(100.0 * count / float(self.totalCount-2), 1)
+        bar = hlsToBash(h,l,s)
+        if self.bold:
+            bar += bcolors.BOLD
+        if self.rainbowWaveEnabled:
+            h_increment = (self.__rainbowColorIncrement / float(self.totalCount)) * self.rainbowColorChangeSpeed
+            for i in range(filledProgressbarSegments):
+                bar += self.displayPattern[i] + hlsToBash(h,l,s)
+                h += h_increment
+        else:
+            for i in range(filledProgressbarSegments):
+                bar += self.displayPattern[i]
+        bar += bcolors.ENDC
+        bar += '-' * (self.segments - filledProgressbarSegments)
 
-# progressbarSegments = 60 # 
-# cycleCharsDeque = deque(repeatList(chars, progressbarSegments)) # deque needed for cyclic rotation of chars
+        if(count >= self.totalCount-1):
+            sys.stdout.write('\n')
+            sys.stdout.flush()
+            return
+        sys.stdout.write('[{0}] {1}% ...{2}\r'.format(bar, percentage, message))
+        sys.stdout.flush()
 
-# # demo 1
-# total = 1500
-# for i in range(total):
-#     sleep(0.02) # simulate task that takes a while
-#     progress(
-#         count=i, total=total, cycleCharsDeque=cycleCharsDeque, message='myMessage',
-#         progressbarSegments=progressbarSegments, boldChars=False, rainbowWave=True, 
-#         charsColorDistanceParam=25, colorChangeSpeedParam=4.0,
-#         luminosity=0.65, saturation=1.0)
+    def __generateCharsDeque(self, patternString: str):
+        chars = [char for char in patternString]
+        dispPattern = deque(self.__repeatList(chars, self.segments))
+        return dispPattern
 
-#     if(i % 5 == 0): # simple mechanism to only rotate chars every 5 loop steps (may vary in your case)
-#         cycleCharsDeque.rotate(-1) # cyclic rotation of charsList
-
-# # demo 2
-# chars = [char for char in tableflip]
-# cycleCharsDeque = deque(repeatList(chars, progressbarSegments)) # deque needed for cyclic rotation of chars
-# for i in range(total):
-#     sleep(0.02) # simulate task that takes a while
-#     progress(
-#         count=i, total=total, cycleCharsDeque=cycleCharsDeque, message='TROLOLOL',
-#         progressbarSegments=progressbarSegments, boldChars=False, rainbowWave=True, 
-#         charsColorDistanceParam=25, colorChangeSpeedParam=4.0,
-#         luminosity=0.65, saturation=1.0)
-
-#     if(i % 5 == 0): # simple mechanism to only rotate chars every 5 loop steps (may vary in your case)
-#         cycleCharsDeque.rotate(1) # cyclic rotation of charsList
-# endregion 
+    def __repeatList(self, l, n):
+        '''
+        Repeats a given list l until length n is reached.
+        e.g. [1,2,3] -> repeatList([1,2,3], 7) -> returns [1,2,3,1,2,3,1]
+        '''
+        l.extend(l * n)
+        l = l[:n]
+        return l
