@@ -15,10 +15,7 @@ total = 1500
 progressbar = Progressbar(total)
 # optional parameters that can be set to your liking
 progressbar.SetDisplayPattern("wave")
-progressbar.animateLeftToRight = True
 progressbar.animationSpeed = 5
-progressbar.rainbowWaveEnabled = True
-
 simulateLongTask(progressbar)
 
 progressbar.SetDisplayPattern("rectangles")
